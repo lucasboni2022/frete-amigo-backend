@@ -5,15 +5,8 @@ const initDatabase = async () => {
   const connection = await pool.getConnection();
   
   try {
-    // Criar banco de dados se não existir
-    await connection.query(`
-      CREATE DATABASE IF NOT EXISTS frete_amigo 
-      CHARACTER SET utf8mb4 
-      COLLATE utf8mb4_unicode_ci;
-    `);
-
-    // Selecionar o banco
-    await connection.changeUser({ database: 'frete_amigo' });
+    // Nota: Banco de dados deve ser criado manualmente no servidor
+    // O usuário não tem permissão para criar bancos, apenas usar o existente
 
     // Tabela de usuários
     await connection.query(`
