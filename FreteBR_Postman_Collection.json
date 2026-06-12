@@ -1,0 +1,402 @@
+{
+  "info": {
+    "_postman_id": "frete-amigo-backend-collection",
+    "name": "FreteBR Backend - freteamigo.premolexpert.com.br",
+    "description": "Collection completa para testar todos os endpoints da API FreteBR Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Autenticação",
+      "item": [
+        {
+          "name": "Registrar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"senha\": \"Senha@123\",\n  \"nome_completo\": \"João Silva\",\n  \"telefone\": \"11999999999\",\n  \"tipo_perfil\": \"embarcador\"\n}"
+            },
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/auth/register",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Registrar novo usuário"
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"usuario@example.com\",\n  \"senha\": \"Senha@123\"\n}"
+            },
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/auth/login",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Fazer login e obter token JWT"
+          },
+          "response": []
+        },
+        {
+          "name": "Obter Perfil",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/auth/profile",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Obter dados do perfil do usuário logado"
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Perfil",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome_completo\": \"João Silva Santos\",\n  \"telefone\": \"11988888888\",\n  \"empresa\": \"Silva Transportes\",\n  \"cidade\": \"São Paulo\",\n  \"estado\": \"SP\"\n}"
+            },
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/auth/profile",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Atualizar dados do perfil"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cargas",
+      "item": [
+        {
+          "name": "Listar Cargas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/cargas?origem_estado=SP&destino_estado=RJ&tipo_veiculo=Truck&page=1&limit=10",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "cargas"
+              ],
+              "query": [
+                {
+                  "key": "origem_estado",
+                  "value": "SP"
+                },
+                {
+                  "key": "destino_estado",
+                  "value": "RJ"
+                },
+                {
+                  "key": "tipo_veiculo",
+                  "value": "Truck"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Listar todas as cargas com filtros opcionais"
+          },
+          "response": []
+        },
+        {
+          "name": "Obter Carga por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/cargas/{{carga_id}}",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "cargas",
+                "{{carga_id}}"
+              ]
+            },
+            "description": "Obter dados específicos de uma carga"
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Carga",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origem_cidade\": \"São Paulo\",\n  \"origem_estado\": \"SP\",\n  \"destino_cidade\": \"Rio de Janeiro\",\n  \"destino_estado\": \"RJ\",\n  \"data_coleta\": \"2024-07-20\",\n  \"tipo_carga\": \"Eletrônicos\",\n  \"peso_kg\": 500,\n  \"valor_frete\": 1500,\n  \"tipo_veiculo\": \"Truck\",\n  \"tipo_carroceria\": \"Baú\",\n  \"observacoes\": \"Carga frágil - cuidado ao manusear\"\n}"
+            },
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/cargas",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "cargas"
+              ]
+            },
+            "description": "Criar nova carga (requer autenticação)"
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Carga",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"valor_frete\": 1800,\n  \"status\": \"negociando\",\n  \"tipo_carroceria\": \"Graneleira\",\n  \"observacoes\": \"Valor negociado\"\n}"
+            },
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/cargas/{{carga_id}}",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "cargas",
+                "{{carga_id}}"
+              ]
+            },
+            "description": "Atualizar dados de uma carga"
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Carga",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/cargas/{{carga_id}}",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "cargas",
+                "{{carga_id}}"
+              ]
+            },
+            "description": "Deletar uma carga"
+          },
+          "response": []
+        },
+        {
+          "name": "Minhas Cargas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://freteamigo.premolexpert.com.br/api/cargas/my-cargas/list?status=ativa&page=1&limit=10",
+              "protocol": "https",
+              "host": [
+                "freteamigo",
+                "premolexpert",
+                "com",
+                "br"
+              ],
+              "path": [
+                "api",
+                "cargas",
+                "my-cargas",
+                "list"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ativa"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Listar minhas cargas publicadas"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://freteamigo.premolexpert.com.br/api/health",
+          "protocol": "https",
+          "host": [
+            "freteamigo",
+            "premolexpert",
+            "com",
+            "br"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        },
+        "description": "Verificar se o servidor está online"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "carga_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
