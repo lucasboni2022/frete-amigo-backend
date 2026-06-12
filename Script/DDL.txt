@@ -1,0 +1,98 @@
+-- Schema base para MySQL 8+
+-- Charset/collation recomendados
+SET NAMES utf8mb4;
+SET time_zone = '+00:00';
+
+-- Tabela de usuários base
+CREATE TABLE users (
+  id CHAR(36) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  nome_completo VARCHAR(255) NULL,
+  telefone VARCHAR(30) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_users_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Perfis
+CREATE TABLE profiles (
+  id CHAR(36) NOT NULL,
+  nome_completo TEXT NOT NULL,
+  telefone VARCHAR(30) NULL,
+  empresa VARCHAR(255) NULL,
+  tipo ENUM('motorista', 'embarcador', 'transportadora') NOT NULL DEFAULT 'embarcador',
+  cidade VARCHAR(255) NULL,
+  estado VARCHAR(255) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_profiles_user
+    FOREIGN KEY (id) REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Papéis de usuário
+CREATE TABLE user_roles (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  role ENUM('admin', 'user') NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_user_roles_user_role (user_id, role),
+  KEY idx_user_roles_user_id (user_id),
+  CONSTRAINT fk_user_roles_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Cargas
+CREATE TABLE cargas (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  origem_cidade VARCHAR(255) NOT NULL,
+  origem_estado VARCHAR(255) NOT NULL,
+  destino_cidade VARCHAR(255) NOT NULL,
+  destino_estado VARCHAR(255) NOT NULL,
+  data_coleta DATE NOT NULL,
+  tipo_carga VARCHAR(255) NOT NULL,
+  peso_kg DECIMAL(10,2) NOT NULL,
+  valor_frete DECIMAL(10,2) NULL,
+  tipo_veiculo VARCHAR(255) NOT NULL,
+  tipo_carroceria VARCHAR(255) NULL,
+  observacoes TEXT NULL,
+  status ENUM('ativa', 'negociando', 'fechada', 'cancelada') NOT NULL DEFAULT 'ativa',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_cargas_status (status),
+  KEY idx_cargas_origem (origem_estado, origem_cidade),
+  KEY idx_cargas_destino (destino_estado, destino_cidade),
+  KEY idx_cargas_user_id (user_id),
+  CONSTRAINT fk_cargas_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Trigger para criar profile automaticamente ao inserir usuário
+DELIMITER $$
+
+CREATE TRIGGER trg_users_after_insert_create_profile
+AFTER INSERT ON users
+FOR EACH ROW
+BEGIN
+  INSERT INTO profiles (id, nome_completo, telefone, tipo)
+  VALUES (
+    NEW.id,
+    COALESCE(NULLIF(NEW.nome_completo, ''), NEW.email),
+    NEW.telefone,
+    'embarcador'
+  )
+  ON DUPLICATE KEY UPDATE
+    nome_completo = VALUES(nome_completo),
+    telefone = VALUES(telefone);
+END$$
+
+DELIMITER ;
