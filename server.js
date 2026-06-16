@@ -42,15 +42,41 @@ const startServer = async () => {
     await initDatabase();
 
     // Iniciar servidor
-    app.listen(PORT, () => {
-      console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+    const server = app.listen(PORT, () => {
+      console.log(`🚀 Servidor rodando na porta ${PORT}`);
       console.log(`📝 API disponível em http://localhost:${PORT}/api`);
+      console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);
     });
+
+    // Graceful shutdown para Hostinger/produção
+    const shutdown = (signal) => {
+      console.log(`\n⚠️  Sinal ${signal} recebido. Encerrando servidor...`);
+      server.close(() => {
+        console.log('✅ Servidor encerrado com sucesso.');
+        pool.end();
+        process.exit(0);
+      });
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+
   } catch (error) {
     console.error('❌ Erro ao iniciar servidor:', error.message);
     process.exit(1);
   }
 };
+
+// Captura erros não tratados
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled Rejection:', reason);
+  process.exit(1);
+});
 
 startServer();
 
