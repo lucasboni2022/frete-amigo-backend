@@ -1,7 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import pool from '../config/database.js';
+import { sendPasswordResetEmail } from '../utils/emailService.js';
 
 // Registrar novo usuário
 export const register = async (req, res) => {
@@ -201,5 +203,121 @@ export const updateProfile = async (req, res) => {
   } catch (error) {
     console.error('Erro ao atualizar perfil:', error);
     res.status(500).json({ message: 'Erro ao atualizar perfil' });
+  }
+};
+
+// Solicitar redefinição de senha (Esqueci minha senha)
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'E-mail é obrigatório' });
+    }
+
+    const connection = await pool.getConnection();
+
+    try {
+      // Verificar se o usuário existe
+      const [users] = await connection.query(
+        'SELECT id, nome_completo FROM users WHERE email = ?',
+        [email]
+      );
+
+      // Retornamos sempre a mesma mensagem por segurança (evita enumeração de e-mails)
+      if (users.length === 0) {
+        return res.json({
+          message: 'Se este e-mail estiver cadastrado, você receberá as instruções em breve.'
+        });
+      }
+
+      const user = users[0];
+
+      // Gerar token seguro de 32 bytes
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+      // Remover tokens anteriores desse usuário (apenas um ativo por vez)
+      await connection.query(
+        'DELETE FROM password_reset_tokens WHERE user_id = ?',
+        [user.id]
+      );
+
+      // Salvar novo token
+      await connection.query(
+        `INSERT INTO password_reset_tokens (id, user_id, token, expires_at)
+         VALUES (?, ?, ?, ?)`,
+        [uuidv4(), user.id, resetToken, expiresAt]
+      );
+
+      // Enviar e-mail
+      await sendPasswordResetEmail(email, resetToken, user.nome_completo);
+
+      res.json({
+        message: 'Se este e-mail estiver cadastrado, você receberá as instruções em breve.'
+      });
+    } finally {
+      await connection.release();
+    }
+  } catch (error) {
+    console.error('Erro ao solicitar redefinição de senha:', error);
+    res.status(500).json({ message: 'Erro ao processar solicitação' });
+  }
+};
+
+// Redefinir senha com token
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, nova_senha } = req.body;
+
+    if (!token || !nova_senha) {
+      return res.status(400).json({ message: 'Token e nova senha são obrigatórios' });
+    }
+
+    if (nova_senha.length < 6) {
+      return res.status(400).json({ message: 'A senha deve ter pelo menos 6 caracteres' });
+    }
+
+    const connection = await pool.getConnection();
+
+    try {
+      // Buscar token válido e não expirado
+      const [tokens] = await connection.query(
+        `SELECT prt.id, prt.user_id, prt.expires_at
+         FROM password_reset_tokens prt
+         WHERE prt.token = ? AND prt.expires_at > NOW()`,
+        [token]
+      );
+
+      if (tokens.length === 0) {
+        return res.status(400).json({
+          message: 'Token inválido ou expirado. Solicite uma nova redefinição de senha.'
+        });
+      }
+
+      const resetRecord = tokens[0];
+
+      // Hash da nova senha
+      const hashedPassword = await bcrypt.hash(nova_senha, 10);
+
+      // Atualizar senha do usuário
+      await connection.query(
+        'UPDATE users SET password = ? WHERE id = ?',
+        [hashedPassword, resetRecord.user_id]
+      );
+
+      // Invalidar o token usado
+      await connection.query(
+        'DELETE FROM password_reset_tokens WHERE id = ?',
+        [resetRecord.id]
+      );
+
+      res.json({ message: 'Senha redefinida com sucesso! Faça login com sua nova senha.' });
+    } finally {
+      await connection.release();
+    }
+  } catch (error) {
+    console.error('Erro ao redefinir senha:', error);
+    res.status(500).json({ message: 'Erro ao redefinir senha' });
   }
 };
