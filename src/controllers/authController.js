@@ -12,8 +12,8 @@ export const register = async (req, res) => {
 
     // Validar entrada
     if (!email || !senha || !nome_completo) {
-      return res.status(400).json({ 
-        message: 'Email, senha e nome completo são obrigatórios' 
+      return res.status(400).json({
+        message: 'Email, senha e nome completo são obrigatórios'
       });
     }
 
@@ -87,8 +87,8 @@ export const login = async (req, res) => {
     const { email, senha } = req.body;
 
     if (!email || !senha) {
-      return res.status(400).json({ 
-        message: 'Email e senha são obrigatórios' 
+      return res.status(400).json({
+        message: 'Email e senha são obrigatórios'
       });
     }
 
@@ -261,7 +261,10 @@ export const forgotPassword = async (req, res) => {
     }
   } catch (error) {
     console.error('Erro ao solicitar redefinição de senha:', error);
-    res.status(500).json({ message: 'Erro ao processar solicitação' });
+    res.status(500).json({
+      message: error.message || 'Erro ao processar solicitação',
+      error: error.message
+    });
   }
 };
 
