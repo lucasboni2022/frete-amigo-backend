@@ -175,28 +175,49 @@ export const getProfile = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.userId;
-    const { nome_completo, telefone, empresa, cidade, estado } = req.body;
+    const { nome_completo, telefone, empresa, cidade, estado, tipo_perfil } = req.body;
+
+    // Validar tipo_perfil se fornecido
+    const tiposValidos = ['motorista', 'embarcador', 'transportadora'];
+    if (tipo_perfil && !tiposValidos.includes(tipo_perfil)) {
+      return res.status(400).json({
+        message: `Tipo de perfil inválido. Valores aceitos: ${tiposValidos.join(', ')}`
+      });
+    }
 
     const connection = await pool.getConnection();
 
     try {
-      // Atualizar usuário
-      if (nome_completo || telefone) {
+      // Atualizar dados base do usuário
+      if (nome_completo !== undefined || telefone !== undefined) {
         await connection.query(
           `UPDATE users SET nome_completo = ?, telefone = ? WHERE id = ?`,
           [nome_completo || null, telefone || null, userId]
         );
       }
 
-      // Atualizar perfil
-      if (empresa || cidade || estado) {
+      // Atualizar perfil (incluindo tipo_perfil)
+      if (empresa !== undefined || cidade !== undefined || estado !== undefined || tipo_perfil) {
         await connection.query(
-          `UPDATE profiles SET empresa = ?, cidade = ?, estado = ? WHERE id = ?`,
-          [empresa || null, cidade || null, estado || null, userId]
+          `UPDATE profiles SET empresa = ?, cidade = ?, estado = ?, tipo = COALESCE(?, tipo) WHERE id = ?`,
+          [empresa || null, cidade || null, estado || null, tipo_perfil || null, userId]
         );
       }
 
-      res.json({ message: 'Perfil atualizado com sucesso' });
+      // Retornar perfil atualizado
+      const [updated] = await connection.query(
+        `SELECT u.id, u.email, u.nome_completo, u.telefone, u.created_at,
+                p.empresa, p.tipo, p.cidade, p.estado
+         FROM users u
+         LEFT JOIN profiles p ON u.id = p.id
+         WHERE u.id = ?`,
+        [userId]
+      );
+
+      res.json({
+        message: 'Perfil atualizado com sucesso',
+        user: updated[0]
+      });
     } finally {
       await connection.release();
     }
