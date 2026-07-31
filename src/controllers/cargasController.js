@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import pool from '../config/database.js';
+import { hasActivePlan } from '../services/hotmartService.js';
+
 
 // Criar nova carga
 export const createCarga = async (req, res) => {
@@ -296,5 +298,67 @@ export const getMyCargos = async (req, res) => {
   } catch (error) {
     console.error('Erro ao listar minhas cargas:', error);
     res.status(500).json({ message: 'Erro ao listar minhas cargas' });
+  }
+};
+
+// Obter contato do embarcador (requer plano ativo na Hotmart)
+export const getEmbarcadorContato = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
+    const connection = await pool.getConnection();
+
+    try {
+      // 1. Buscar e-mail do usuário logado
+      const [users] = await connection.query(
+        'SELECT email FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (users.length === 0) {
+        return res.status(404).json({ message: 'Usuário não encontrado' });
+      }
+
+      const userEmail = users[0].email;
+
+      // 2. Verificar assinatura ativa na Hotmart (chamada em tempo real)
+      const planActive = await hasActivePlan(userEmail);
+
+      if (!planActive) {
+        return res.status(403).json({
+          message: 'Plano necessário para ver o contato do embarcador.',
+          plano_required: true,
+        });
+      }
+
+      // 3. Buscar dados de contato da carga
+      const [cargas] = await connection.query(
+        `SELECT c.contato_telefone, c.contato_email,
+                u.nome_completo as embarcador_nome, u.telefone as embarcador_telefone, u.email as embarcador_email
+         FROM cargas c
+         LEFT JOIN users u ON c.user_id = u.id
+         WHERE c.id = ?`,
+        [id]
+      );
+
+      if (cargas.length === 0) {
+        return res.status(404).json({ message: 'Carga não encontrada' });
+      }
+
+      const carga = cargas[0];
+
+      // Retorna os dados de contato disponíveis
+      // Prioriza contato_telefone/contato_email da carga; usa dados do dono como fallback
+      res.json({
+        contato_telefone: carga.contato_telefone || carga.embarcador_telefone || null,
+        contato_email: carga.contato_email || carga.embarcador_email || null,
+        embarcador_nome: carga.embarcador_nome || null,
+      });
+    } finally {
+      await connection.release();
+    }
+  } catch (error) {
+    console.error('Erro ao obter contato do embarcador:', error);
+    res.status(500).json({ message: 'Erro ao obter contato do embarcador' });
   }
 };

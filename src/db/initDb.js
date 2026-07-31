@@ -90,6 +90,44 @@ const initDatabase = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    // Tabela de tokens de redefinição de senha
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id VARCHAR(36) NOT NULL PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL,
+        token VARCHAR(64) NOT NULL UNIQUE,
+        expires_at DATETIME NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_prt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_prt_token (token),
+        INDEX idx_prt_user (user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Tabela de assinaturas Hotmart (atualizada via webhook em tempo real)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS hotmart_subscriptions (
+        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        subscriber_email VARCHAR(255) NOT NULL,
+        subscriber_name  VARCHAR(255) NULL,
+        subscription_code VARCHAR(100) NULL,
+        product_id VARCHAR(100) NULL,
+        plan_name  VARCHAR(255) NULL,
+        status ENUM(
+          'ACTIVE','DELAYED','INACTIVE','STARTED',
+          'EXPIRED','CANCELLED','CHARGEBACK','PENDING'
+        ) NOT NULL DEFAULT 'INACTIVE',
+        event_type VARCHAR(100) NULL COMMENT 'Último evento Hotmart processado',
+        hotmart_data JSON NULL COMMENT 'Payload completo do último evento',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        INDEX idx_hs_email (subscriber_email),
+        INDEX idx_hs_status (status),
+        UNIQUE KEY uq_hs_email_product (subscriber_email, product_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
     console.log('✅ Banco de dados inicializado com sucesso!');
   } catch (error) {
     console.error('❌ Erro ao inicializar banco:', error);

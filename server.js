@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './src/routes/authRoutes.js';
 import cargasRoutes from './src/routes/cargasRoutes.js';
+import hotmartWebhookRoutes from './src/routes/hotmartWebhookRoutes.js';
 import pool from './src/config/database.js';
 import initDatabase from './src/db/initDb.js';
 
@@ -23,6 +24,11 @@ app.use(express.urlencoded({ extended: true }));
 // Rotas
 app.use('/api/auth', authRoutes);
 app.use('/api/cargas', cargasRoutes);
+
+// Webhook Hotmart — rota pública sem prefixo /api
+// Nome da configuração: frete-amigo-webhook
+// URL configurada na Hotmart: https://freteamigo.com.br/verificar-plano
+app.use('/verificar-plano', hotmartWebhookRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

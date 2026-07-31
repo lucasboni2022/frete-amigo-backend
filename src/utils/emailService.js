@@ -32,7 +32,7 @@ const createTransporter = () => {
  */
 export const sendPasswordResetEmail = async (toEmail, resetToken, userName) => {
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+  const resetLink = `${frontendUrl}/redefinir-senha?token=${resetToken}`;
 
   // Modo dev: SMTP não configurado → apenas loga o link no console
   if (!isSmtpConfigured()) {
