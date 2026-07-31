@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import pool from '../config/database.js';
 import { sendPasswordResetEmail } from '../utils/emailService.js';
+import { getSubscriptionDetails } from '../services/hotmartService.js';
 
 // Registrar novo usuário
 export const register = async (req, res) => {
@@ -345,3 +346,36 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ message: 'Erro ao redefinir senha' });
   }
 };
+
+// Verificar status da assinatura do usuário logado
+export const checkSubscriptionStatus = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const connection = await pool.getConnection();
+
+    try {
+      const [users] = await connection.query(
+        'SELECT email FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (users.length === 0) {
+        return res.status(404).json({ message: 'Usuário não encontrado' });
+      }
+
+      const email = users[0].email;
+      const subDetails = await getSubscriptionDetails(email);
+
+      res.json({
+        email,
+        ...subDetails
+      });
+    } finally {
+      await connection.release();
+    }
+  } catch (error) {
+    console.error('Erro ao verificar status de assinatura:', error);
+    res.status(500).json({ message: 'Erro ao verificar assinatura' });
+  }
+};
+

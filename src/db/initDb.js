@@ -75,7 +75,7 @@ const initDatabase = async () => {
         tipo_veiculo VARCHAR(255) NOT NULL,
         tipo_carroceria VARCHAR(255) NULL,
         observacoes TEXT NULL,
-        status ENUM('ativa', 'negociando', 'fechada', 'cancelada') NOT NULL DEFAULT 'ativa',
+        status ENUM('aguardando_motorista','contato_liberado','finalizada') NOT NULL DEFAULT 'aguardando_motorista',
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -89,6 +89,27 @@ const initDatabase = async () => {
           ON UPDATE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Migration: atualizar ENUM de status se tabela já existia com valores antigos
+    try {
+      await connection.query(`
+        ALTER TABLE cargas
+          MODIFY COLUMN status
+          ENUM('aguardando_motorista','contato_liberado','finalizada')
+          NOT NULL DEFAULT 'aguardando_motorista'
+      `);
+      // Migrar dados legados
+      await connection.query(`
+        UPDATE cargas SET status = 'aguardando_motorista'
+        WHERE status NOT IN ('aguardando_motorista','contato_liberado','finalizada')
+           OR status IS NULL
+      `);
+    } catch (migrationErr) {
+      // Ignora erro se ENUM já está correto
+      if (!migrationErr.message?.includes('aguardando_motorista')) {
+        console.warn('Migration status cargas (pode ser ignorado se já aplicado):', migrationErr.message);
+      }
+    }
 
     // Tabela de tokens de redefinição de senha
     await connection.query(`

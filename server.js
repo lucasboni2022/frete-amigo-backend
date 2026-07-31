@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import authRoutes from './src/routes/authRoutes.js';
 import cargasRoutes from './src/routes/cargasRoutes.js';
 import hotmartWebhookRoutes from './src/routes/hotmartWebhookRoutes.js';
+import adminRoutes from './src/routes/adminRoutes.js';
 import pool from './src/config/database.js';
 import initDatabase from './src/db/initDb.js';
 
@@ -29,6 +30,9 @@ app.use('/api/cargas', cargasRoutes);
 // Nome da configuração: frete-amigo-webhook
 // URL configurada na Hotmart: https://freteamigo.com.br/verificar-plano
 app.use('/verificar-plano', hotmartWebhookRoutes);
+
+// Rotas administrativas — protegidas por X-Admin-Secret
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

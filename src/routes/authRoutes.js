@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, getProfile, updateProfile, forgotPassword, resetPassword } from '../controllers/authController.js';
+import { register, login, getProfile, updateProfile, forgotPassword, resetPassword, checkSubscriptionStatus } from '../controllers/authController.js';
 import verifyToken from '../middleware/auth.js';
 
 const router = express.Router();
@@ -13,5 +13,7 @@ router.post('/reset-password', resetPassword);
 // Rotas protegidas
 router.get('/profile', verifyToken, getProfile);
 router.put('/profile', verifyToken, updateProfile);
+router.get('/subscription-status', verifyToken, checkSubscriptionStatus);
 
 export default router;
+

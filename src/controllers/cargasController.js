@@ -54,7 +54,7 @@ export const createCarga = async (req, res) => {
           tipo_carga,
           peso_kg,
           tipo_veiculo,
-          status: 'ativa'
+          status: 'aguardando_motorista'
         }
       });
     } finally {
@@ -187,7 +187,7 @@ export const updateCarga = async (req, res) => {
     try {
       // Verificar se a carga pertence ao usuário
       const [cargas] = await connection.query(
-        'SELECT user_id FROM cargas WHERE id = ?',
+        'SELECT user_id, status FROM cargas WHERE id = ?',
         [id]
       );
 
@@ -199,10 +199,21 @@ export const updateCarga = async (req, res) => {
         return res.status(403).json({ message: 'Sem permissão para atualizar esta carga' });
       }
 
+      // Bloquear edição se carga não está aguardando motorista
+      if (cargas[0].status !== 'aguardando_motorista' && req.userRole !== 'admin') {
+        return res.status(403).json({
+          message: 'Não é possível editar uma carga que já possui solicitações ou está finalizada.'
+        });
+      }
+
+      // Validar novo status
+      const statusValidos = ['aguardando_motorista', 'contato_liberado', 'finalizada'];
+      const novoStatus = status && statusValidos.includes(status) ? status : cargas[0].status;
+
       // Atualizar carga
       await connection.query(
         `UPDATE cargas SET valor_frete = ?, status = ?, tipo_carroceria = ?, observacoes = ? WHERE id = ?`,
-        [valor_frete || null, status || 'ativa', tipo_carroceria || null, observacoes || null, id]
+        [valor_frete || null, novoStatus, tipo_carroceria || null, observacoes || null, id]
       );
 
       res.json({ message: 'Carga atualizada com sucesso' });
@@ -226,7 +237,7 @@ export const deleteCarga = async (req, res) => {
     try {
       // Verificar se a carga pertence ao usuário
       const [cargas] = await connection.query(
-        'SELECT user_id FROM cargas WHERE id = ?',
+        'SELECT user_id, status FROM cargas WHERE id = ?',
         [id]
       );
 
@@ -236,6 +247,13 @@ export const deleteCarga = async (req, res) => {
 
       if (cargas[0].user_id !== userId && req.userRole !== 'admin') {
         return res.status(403).json({ message: 'Sem permissão para deletar esta carga' });
+      }
+
+      // Bloquear exclusão se carga não está aguardando motorista
+      if (cargas[0].status !== 'aguardando_motorista' && req.userRole !== 'admin') {
+        return res.status(403).json({
+          message: 'Não é possível excluir uma carga que já possui solicitações ou está finalizada.'
+        });
       }
 
       await connection.query('DELETE FROM cargas WHERE id = ?', [id]);
