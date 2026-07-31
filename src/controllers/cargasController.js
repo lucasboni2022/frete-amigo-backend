@@ -72,7 +72,7 @@ export const listCargas = async (req, res) => {
     const { origem_estado, destino_estado, tipo_veiculo, status, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = 'SELECT * FROM cargas WHERE 1=1';
+    let query = `SELECT *, DATE_FORMAT(data_coleta, '%Y-%m-%d') as data_coleta FROM cargas WHERE 1=1`;
     const params = [];
 
     if (origem_estado) {
@@ -153,7 +153,8 @@ export const getCargaById = async (req, res) => {
 
     try {
       const [cargas] = await connection.query(
-        `SELECT c.*, u.nome_completo as user_name, u.email, u.telefone
+        `SELECT c.*, DATE_FORMAT(c.data_coleta, '%Y-%m-%d') as data_coleta,
+                u.nome_completo as user_name, u.email, u.telefone
          FROM cargas c
          LEFT JOIN users u ON c.user_id = u.id
          WHERE c.id = ?`,
@@ -256,7 +257,7 @@ export const getMyCargos = async (req, res) => {
     const { status, page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
 
-    let query = 'SELECT * FROM cargas WHERE user_id = ?';
+    let query = `SELECT *, DATE_FORMAT(data_coleta, '%Y-%m-%d') as data_coleta FROM cargas WHERE user_id = ?`;
     const params = [userId];
 
     if (status) {
