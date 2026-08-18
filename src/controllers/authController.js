@@ -9,12 +9,26 @@ import { getSubscriptionDetails } from '../services/hotmartService.js';
 // Registrar novo usuário
 export const register = async (req, res) => {
   try {
-    const { email, senha, nome_completo, telefone, tipo_perfil } = req.body;
+    const { email, senha, nome_completo, telefone, tipo_perfil, cpf, cnpj } = req.body;
 
     // Validar entrada
     if (!email || !senha || !nome_completo) {
       return res.status(400).json({
         message: 'Email, senha e nome completo são obrigatórios'
+      });
+    }
+
+    // Validar obrigatoriedade de CNPJ para Embarcador e CPF para Caminhoneiro
+    const perfil = tipo_perfil || 'embarcador';
+    if (perfil === 'embarcador' && (!cnpj || !cnpj.trim())) {
+      return res.status(400).json({
+        message: 'CNPJ é obrigatório para o perfil Embarcador'
+      });
+    }
+
+    if ((perfil === 'caminhoneiro' || perfil === 'motorista') && (!cpf || !cpf.trim())) {
+      return res.status(400).json({
+        message: 'CPF é obrigatório para o perfil Caminhoneiro'
       });
     }
 
@@ -44,9 +58,9 @@ export const register = async (req, res) => {
 
       // Inserir perfil
       await connection.query(
-        `INSERT INTO profiles (id, nome_completo, telefone, tipo) 
-         VALUES (?, ?, ?, ?)`,
-        [userId, nome_completo, telefone || null, tipo_perfil || 'embarcador']
+        `INSERT INTO profiles (id, nome_completo, telefone, tipo, cpf, cnpj) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [userId, nome_completo, telefone || null, perfil, cpf || null, cnpj || null]
       );
 
       // Inserir role padrão
@@ -70,7 +84,11 @@ export const register = async (req, res) => {
           id: userId,
           email,
           nome_completo,
-          tipo: tipo_perfil || 'embarcador'
+          telefone: telefone || null,
+          tipo: perfil,
+          tipo_perfil: perfil,
+          cpf: cpf || null,
+          cnpj: cnpj || null
         }
       });
     } finally {
@@ -97,7 +115,11 @@ export const login = async (req, res) => {
 
     try {
       const [users] = await connection.query(
-        'SELECT id, email, nome_completo, password FROM users WHERE email = ?',
+        `SELECT u.id, u.email, u.nome_completo, u.telefone, u.password,
+                p.tipo, p.cpf, p.cnpj, p.empresa, p.cidade, p.estado
+         FROM users u
+         LEFT JOIN profiles p ON u.id = p.id
+         WHERE u.email = ?`,
         [email]
       );
 
@@ -130,7 +152,15 @@ export const login = async (req, res) => {
         user: {
           id: user.id,
           email: user.email,
-          nome_completo: user.nome_completo
+          nome_completo: user.nome_completo,
+          telefone: user.telefone,
+          tipo: user.tipo || 'embarcador',
+          tipo_perfil: user.tipo || 'embarcador',
+          cpf: user.cpf || null,
+          cnpj: user.cnpj || null,
+          empresa: user.empresa || null,
+          cidade: user.cidade || null,
+          estado: user.estado || null
         }
       });
     } finally {
@@ -151,7 +181,7 @@ export const getProfile = async (req, res) => {
     try {
       const [users] = await connection.query(
         `SELECT u.id, u.email, u.nome_completo, u.telefone, u.created_at,
-                p.empresa, p.tipo, p.cidade, p.estado
+                p.empresa, p.tipo, p.tipo AS tipo_perfil, p.cidade, p.estado, p.cpf, p.cnpj
          FROM users u
          LEFT JOIN profiles p ON u.id = p.id
          WHERE u.id = ?`,
@@ -176,10 +206,10 @@ export const getProfile = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const userId = req.userId;
-    const { nome_completo, telefone, empresa, cidade, estado, tipo_perfil } = req.body;
+    const { nome_completo, telefone, empresa, cidade, estado, tipo_perfil, cpf, cnpj } = req.body;
 
     // Validar tipo_perfil se fornecido
-    const tiposValidos = ['motorista', 'embarcador', 'transportadora'];
+    const tiposValidos = ['motorista', 'embarcador', 'transportadora', 'caminhoneiro'];
     if (tipo_perfil && !tiposValidos.includes(tipo_perfil)) {
       return res.status(400).json({
         message: `Tipo de perfil inválido. Valores aceitos: ${tiposValidos.join(', ')}`
@@ -197,18 +227,33 @@ export const updateProfile = async (req, res) => {
         );
       }
 
-      // Atualizar perfil (incluindo tipo_perfil)
-      if (empresa !== undefined || cidade !== undefined || estado !== undefined || tipo_perfil) {
+      // Atualizar perfil (incluindo tipo_perfil, cpf, cnpj)
+      if (empresa !== undefined || cidade !== undefined || estado !== undefined || tipo_perfil || cpf !== undefined || cnpj !== undefined) {
         await connection.query(
-          `UPDATE profiles SET empresa = ?, cidade = ?, estado = ?, tipo = COALESCE(?, tipo) WHERE id = ?`,
-          [empresa || null, cidade || null, estado || null, tipo_perfil || null, userId]
+          `UPDATE profiles SET 
+             empresa = ?, 
+             cidade = ?, 
+             estado = ?, 
+             tipo = COALESCE(?, tipo),
+             cpf = ?,
+             cnpj = ?
+           WHERE id = ?`,
+          [
+            empresa !== undefined ? (empresa || null) : null,
+            cidade !== undefined ? (cidade || null) : null,
+            estado !== undefined ? (estado || null) : null,
+            tipo_perfil || null,
+            cpf !== undefined ? (cpf || null) : null,
+            cnpj !== undefined ? (cnpj || null) : null,
+            userId
+          ]
         );
       }
 
       // Retornar perfil atualizado
       const [updated] = await connection.query(
         `SELECT u.id, u.email, u.nome_completo, u.telefone, u.created_at,
-                p.empresa, p.tipo, p.cidade, p.estado
+                p.empresa, p.tipo, p.tipo AS tipo_perfil, p.cidade, p.estado, p.cpf, p.cnpj
          FROM users u
          LEFT JOIN profiles p ON u.id = p.id
          WHERE u.id = ?`,

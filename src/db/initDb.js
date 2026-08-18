@@ -30,9 +30,11 @@ const initDatabase = async () => {
         nome_completo TEXT NOT NULL,
         telefone VARCHAR(30) NULL,
         empresa VARCHAR(255) NULL,
-        tipo ENUM('motorista', 'embarcador', 'transportadora') NOT NULL DEFAULT 'embarcador',
+        tipo ENUM('motorista', 'embarcador', 'transportadora', 'caminhoneiro') NOT NULL DEFAULT 'embarcador',
         cidade VARCHAR(255) NULL,
         estado VARCHAR(255) NULL,
+        cpf VARCHAR(20) NULL,
+        cnpj VARCHAR(20) NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -42,6 +44,27 @@ const initDatabase = async () => {
           ON UPDATE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Migration: adicionar colunas cpf e cnpj na tabela profiles se não existirem
+    try {
+      await connection.query(`
+        ALTER TABLE profiles
+          ADD COLUMN IF NOT EXISTS cpf VARCHAR(20) NULL,
+          ADD COLUMN IF NOT EXISTS cnpj VARCHAR(20) NULL,
+          MODIFY COLUMN tipo ENUM('motorista', 'embarcador', 'transportadora', 'caminhoneiro') NOT NULL DEFAULT 'embarcador'
+      `);
+    } catch (migrationErr) {
+      // Ignorar caso colunas já existam ou versão MySQL não suporte IF NOT EXISTS em ALTER
+      try {
+        await connection.query(`ALTER TABLE profiles ADD COLUMN cpf VARCHAR(20) NULL`);
+      } catch (e) {}
+      try {
+        await connection.query(`ALTER TABLE profiles ADD COLUMN cnpj VARCHAR(20) NULL`);
+      } catch (e) {}
+      try {
+        await connection.query(`ALTER TABLE profiles MODIFY COLUMN tipo ENUM('motorista', 'embarcador', 'transportadora', 'caminhoneiro') NOT NULL DEFAULT 'embarcador'`);
+      } catch (e) {}
+    }
 
     // Tabela de papéis de usuário
     await connection.query(`
