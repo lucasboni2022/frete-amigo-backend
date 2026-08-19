@@ -26,10 +26,33 @@ export const createCarga = async (req, res) => {
       return res.status(400).json({ message: 'Campos obrigatórios não preenchidos' });
     }
 
-    const cargaId = uuidv4();
     const connection = await pool.getConnection();
 
     try {
+      // Buscar e-mail do usuário
+      const [users] = await connection.query(
+        'SELECT email FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (users.length === 0) {
+        return res.status(404).json({ message: 'Usuário não encontrado' });
+      }
+
+      const userEmail = users[0].email;
+
+      // Verificar se o usuário possui plano ativo na Hotmart (exceto admin)
+      if (req.userRole !== 'admin') {
+        const planActive = await hasActivePlan(userEmail);
+        if (!planActive) {
+          return res.status(403).json({
+            message: 'É necessário possuir um plano ativo para publicar as cargas',
+            plano_required: true
+          });
+        }
+      }
+
+      const cargaId = uuidv4();
       await connection.query(
         `INSERT INTO cargas (
           id, user_id, origem_cidade, origem_estado, destino_cidade, destino_estado,
@@ -102,11 +125,11 @@ export const listCargas = async (req, res) => {
 
     try {
       const [cargas] = await connection.query(query, params);
-      
+
       // Contar total de cargas
       let countQuery = 'SELECT COUNT(*) as total FROM cargas WHERE 1=1';
       const countParams = [];
-      
+
       if (origem_estado) {
         countQuery += ' AND origem_estado = ?';
         countParams.push(origem_estado);
@@ -290,7 +313,7 @@ export const getMyCargos = async (req, res) => {
 
     try {
       const [cargas] = await connection.query(query, params);
-      
+
       // Contar total
       let countQuery = 'SELECT COUNT(*) as total FROM cargas WHERE user_id = ?';
       const countParams = [userId];
