@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import pool from '../config/database.js';
 import { sendPasswordResetEmail } from '../utils/emailService.js';
 import { getSubscriptionDetails } from '../services/hotmartService.js';
+import { validateCPF, validateCNPJ } from '../utils/validators.js';
 
 // Registrar novo usuário
 export const register = async (req, res) => {
@@ -20,16 +21,30 @@ export const register = async (req, res) => {
 
     // Validar obrigatoriedade de CNPJ para Embarcador e CPF para Caminhoneiro
     const perfil = tipo_perfil || 'embarcador';
-    if (perfil === 'embarcador' && (!cnpj || !cnpj.trim())) {
-      return res.status(400).json({
-        message: 'CNPJ é obrigatório para o perfil Embarcador'
-      });
+    if (perfil === 'embarcador') {
+      if (!cnpj || !cnpj.trim()) {
+        return res.status(400).json({
+          message: 'CNPJ é obrigatório para o perfil Embarcador'
+        });
+      }
+      if (!validateCNPJ(cnpj)) {
+        return res.status(400).json({
+          message: 'CNPJ informado é inválido. Por favor, verifique os números digitados.'
+        });
+      }
     }
 
-    if ((perfil === 'caminhoneiro' || perfil === 'motorista') && (!cpf || !cpf.trim())) {
-      return res.status(400).json({
-        message: 'CPF é obrigatório para o perfil Caminhoneiro'
-      });
+    if (perfil === 'caminhoneiro' || perfil === 'motorista') {
+      if (!cpf || !cpf.trim()) {
+        return res.status(400).json({
+          message: 'CPF é obrigatório para o perfil Caminhoneiro'
+        });
+      }
+      if (!validateCPF(cpf)) {
+        return res.status(400).json({
+          message: 'CPF informado é inválido. Por favor, verifique os números digitados.'
+        });
+      }
     }
 
     const connection = await pool.getConnection();
@@ -213,6 +228,18 @@ export const updateProfile = async (req, res) => {
     if (tipo_perfil && !tiposValidos.includes(tipo_perfil)) {
       return res.status(400).json({
         message: `Tipo de perfil inválido. Valores aceitos: ${tiposValidos.join(', ')}`
+      });
+    }
+
+    if (cpf && !validateCPF(cpf)) {
+      return res.status(400).json({
+        message: 'CPF informado é inválido. Por favor, verifique os números digitados.'
+      });
+    }
+
+    if (cnpj && !validateCNPJ(cnpj)) {
+      return res.status(400).json({
+        message: 'CNPJ informado é inválido. Por favor, verifique os números digitados.'
       });
     }
 

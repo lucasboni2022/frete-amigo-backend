@@ -52,25 +52,107 @@ const LOG_ONLY_EVENTS = new Set([
  * A Hotmart envia diferentes estruturas dependendo do evento,
  * mas o padrão geral é { event, data: { buyer, product, subscription, ... } }
  */
-function extractPayloadData(body) {
+export function extractPayloadData(body) {
   const event = body?.event || body?.hottok || 'UNKNOWN';
   const data  = body?.data || body;
 
   // Dados do comprador/assinante
-  const buyer = data?.buyer || data?.subscriber || {};
-  const email = (buyer?.email || data?.buyer_email || '').toLowerCase().trim();
-  const name  = buyer?.name || buyer?.name_full || '';
+  const buyer = data?.buyer || data?.subscriber || body?.buyer || body?.subscriber || {};
+  const email = (
+    buyer?.email ||
+    data?.buyer_email ||
+    data?.buyer?.email ||
+    data?.subscriber?.email ||
+    body?.email ||
+    ''
+  ).toLowerCase().trim();
 
-  // Dados da assinatura
+  let name = buyer?.name || buyer?.name_full || '';
+  if (!name && buyer?.first_name) {
+    name = `${buyer.first_name} ${buyer.last_name || ''}`.trim();
+  }
+
+  // Dados da assinatura / transação
   const subscription = data?.subscription || {};
-  const subscriptionCode = subscription?.subscriber?.code || data?.subscription_id || null;
+  const purchase = data?.purchase || {};
+  const subscriptionCode =
+    subscription?.subscriber?.code ||
+    data?.subscription_id ||
+    purchase?.transaction ||
+    null;
   const planName = subscription?.plan?.name || data?.plan?.name || null;
 
   // Dados do produto
   const product = data?.product || {};
-  const productId = String(product?.id || data?.product_id || process.env.HOTMART_PRODUCT_ID || '').trim() || null;
+  const productId = String(
+    product?.id ||
+    product?.ucode ||
+    data?.product_id ||
+    process.env.HOTMART_PRODUCT_ID ||
+    'DEFAULT'
+  ).trim();
 
   return { event, email, name, subscriptionCode, planName, productId };
+}
+
+/**
+ * Processa e salva a assinatura no banco de dados local.
+ */
+export async function processHotmartPayload(body) {
+  const { event, email, name, subscriptionCode, planName, productId } = extractPayloadData(body);
+
+  console.log(`[HotmartWebhook] Evento recebido: ${event} | Email: ${email || 'N/A'}`);
+
+  // Eventos apenas de log — não alteram o banco
+  if (LOG_ONLY_EVENTS.has(event)) {
+    console.log(`[HotmartWebhook] Evento de log: ${event} — sem alteração de status.`);
+    return { status: 'LOG_ONLY', event };
+  }
+
+  // Mapeia o evento para o status interno
+  const newStatus = EVENT_STATUS_MAP[event];
+  if (!newStatus) {
+    console.warn(`[HotmartWebhook] Evento não mapeado: ${event} — ignorado.`);
+    return { status: 'UNMAPPED', event };
+  }
+
+  if (!email) {
+    console.warn(`[HotmartWebhook] Email não encontrado no payload do evento: ${event}`);
+    return { status: 'NO_EMAIL', event };
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    // UPSERT: atualiza se já existe registro para esse email+produto, cria caso contrário
+    await connection.query(
+      `INSERT INTO hotmart_subscriptions
+         (subscriber_email, subscriber_name, subscription_code, product_id, plan_name, status, event_type, hotmart_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         subscriber_name    = VALUES(subscriber_name),
+         subscription_code  = VALUES(subscription_code),
+         plan_name          = VALUES(plan_name),
+         status             = VALUES(status),
+         event_type         = VALUES(event_type),
+         hotmart_data       = VALUES(hotmart_data),
+         updated_at         = CURRENT_TIMESTAMP`,
+      [
+        email,
+        name || null,
+        subscriptionCode,
+        productId,
+        planName || null,
+        newStatus,
+        event,
+        JSON.stringify(body),
+      ]
+    );
+
+    console.log(`[HotmartWebhook] ✅ Status atualizado: ${email} → ${newStatus} (evento: ${event})`);
+    return { status: 'SUCCESS', newStatus, email, event };
+  } finally {
+    connection.release();
+  }
 }
 
 /**
@@ -81,12 +163,16 @@ export const hotmartWebhook = async (req, res) => {
   const body = req.body;
 
   // ── Validação do hottok ───────────────────────────────────────────────────
-  // A Hotmart envia o hottok no body ou como query param para autenticar a origem.
+  // A Hotmart envia o hottok no header X-Hotmart-Hottok, no body ou como query param.
   const expectedHottok = process.env.HOTMART_HOTTOK;
-  const receivedHottok = body?.hottok || req.query?.hottok;
+  const receivedHottok =
+    req.headers['x-hotmart-hottok'] ||
+    req.headers['hottok'] ||
+    body?.hottok ||
+    req.query?.hottok;
 
   if (expectedHottok && receivedHottok !== expectedHottok) {
-    console.warn(`[HotmartWebhook] ⚠️  Hottok inválido recebido: ${receivedHottok}`);
+    console.warn(`[HotmartWebhook] ⚠️  Hottok inválido recebido: ${receivedHottok || 'ausente'}`);
     return res.status(401).json({ error: 'Unauthorized' });
   }
   // ─────────────────────────────────────────────────────────────────────────
@@ -95,62 +181,10 @@ export const hotmartWebhook = async (req, res) => {
   res.status(200).json({ received: true });
 
   try {
-    const { event, email, name, subscriptionCode, planName, productId } = extractPayloadData(body);
-
-    console.log(`[HotmartWebhook] Evento recebido: ${event} | Email: ${email || 'N/A'}`);
-
-    // Eventos apenas de log — não alteram o banco
-    if (LOG_ONLY_EVENTS.has(event)) {
-      console.log(`[HotmartWebhook] Evento de log: ${event} — sem alteração de status.`);
-      return;
-    }
-
-    // Mapeia o evento para o status interno
-    const newStatus = EVENT_STATUS_MAP[event];
-    if (!newStatus) {
-      console.warn(`[HotmartWebhook] Evento não mapeado: ${event} — ignorado.`);
-      return;
-    }
-
-    if (!email) {
-      console.warn(`[HotmartWebhook] Email não encontrado no payload do evento: ${event}`);
-      return;
-    }
-
-    const connection = await pool.getConnection();
-    try {
-      // UPSERT: atualiza se já existe registro para esse email+produto, cria caso contrário
-      await connection.query(
-        `INSERT INTO hotmart_subscriptions
-           (subscriber_email, subscriber_name, subscription_code, product_id, plan_name, status, event_type, hotmart_data)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           subscriber_name    = VALUES(subscriber_name),
-           subscription_code  = VALUES(subscription_code),
-           plan_name          = VALUES(plan_name),
-           status             = VALUES(status),
-           event_type         = VALUES(event_type),
-           hotmart_data       = VALUES(hotmart_data),
-           updated_at         = CURRENT_TIMESTAMP`,
-        [
-          email,
-          name || null,
-          subscriptionCode,
-          productId,
-          planName || null,
-          newStatus,
-          event,
-          JSON.stringify(body),
-        ]
-      );
-
-      console.log(`[HotmartWebhook] ✅ Status atualizado: ${email} → ${newStatus} (evento: ${event})`);
-    } finally {
-      connection.release();
-    }
-
+    await processHotmartPayload(body);
   } catch (err) {
     // Já enviamos 200 — só logamos o erro internamente
     console.error('[HotmartWebhook] ❌ Erro ao processar webhook:', err.message);
   }
 };
+

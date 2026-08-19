@@ -1,4 +1,5 @@
 import pool from '../config/database.js';
+import { seedMissedPurchase } from './seedMissedPurchase.js';
 
 // Script para inicializar o banco de dados
 const initDatabase = async () => {
@@ -171,6 +172,9 @@ const initDatabase = async () => {
         UNIQUE KEY uq_hs_email_product (subscriber_email, product_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Garantir registro de compras pendentes
+    await seedMissedPurchase();
 
     console.log('✅ Banco de dados inicializado com sucesso!');
   } catch (error) {
